@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>MemoryBot Login</title>
+
+  <link rel="stylesheet" href="style.css" />
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" />
+</head>
+
+<body>
+
+  <h1 class="title">
+    🧠 MemoryBot – A Conversational AI ChatBot
+  </h1>
+
+  <div class="login-container">
+
+    <div class="form-title">
+      MemoryBot Login
+    </div>
+
+    <div class="input-group">
+      <label>Username</label>
+      <input type="text" 
+             id="username"
+             placeholder="Enter username..." 
+        />
+    </div>
+
+    <div class="input-group">
+      <label>Groq API Key</label>
+      <input type="password" 
+             id="api_key" 
+             placeholder="Enter Groq API Key..." 
+        />
+    </div>
+
+    <div class="input-group">
+      <label>HF Token</label>
+      <input type="password" 
+             id="hf_token" 
+             placeholder="Enter HF Token..." 
+        />
+    </div>
+
+    <!-- ✅ Error message element -->
+    <p id="error-msg" class="error"></p>
+
+    <button class="login-btn"
+            id="login-btn"
+            onclick="login()"
+    >
+      Login
+    </button>
+
+  </div>
+
+    <script>
+        const BASE_URL = "http://127.0.0.1:8000";
+
+        async function login() {
+            const username = document.getElementById("username").value.trim();
+            const api_key  = document.getElementById("api_key").value.trim();
+            const hf_token = document.getElementById("hf_token").value.trim();
+            const errorMsg = document.getElementById("error-msg");
+            const loginBtn = document.getElementById("login-btn");
+
+            // ── Validate ───────────────────────────────
+            if (!username) {
+                showError("Please enter a username");
+                return;
+            }
+            if (!api_key) {
+                showError("Please enter your Groq API key");
+                return;
+            }
+            if (!hf_token) {
+                showError("Please enter your HF Token");
+                return;
+            }
+
+            loginBtn.disabled    = true;
+            loginBtn.textContent = "Logging in...";
+            errorMsg.style.display = "none";
+
+            try {
+                const response = await fetch(`${BASE_URL}/login`, {
+                    method : "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body   : JSON.stringify({
+                        username: username,
+                        groq_api_key: api_key,
+                        hf_token: hf_token
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // ✅ Save to sessionStorage
+                    sessionStorage.setItem("username", username);
+                    sessionStorage.setItem("groq_api_key",  api_key);
+                    sessionStorage.setItem("hf_token", hf_token);
+
+                    console.log(data.message)
+
+                    // ✅ Redirect to chat page
+                    window.location.href = `chat.html?username=${encodeURIComponent(username)}`;
+                } else {
+                    showError(data.message || "Login failed");
+                }
+
+            } catch (error) {
+                showError("Cannot connect to server. Is the backend running?");
+            } finally {
+                loginBtn.disabled    = false;
+                loginBtn.textContent = "Login";
+            }
+        }
+
+        function showError(message) {
+            const errorMsg         = document.getElementById("error-msg");
+            errorMsg.textContent   = message;
+            errorMsg.style.display = "block";
+        }
+
+        // ── Allow Enter key to login ───────────────────
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") login();
+        });
+    </script>
+
+</body>
+</html>
