@@ -69,3 +69,9 @@ class Chatbot:
                     "tool_call_id": tool_call.id,
                     "content"     : str(tool_result)
                 })
+
+    def get_all_memories(self):
+        return self.memory_manager.get_all_memories()
+    
+    def delete_memory(self, mem_to_delete):
+        return self.memory_manager.delete_memory(mem_to_delete)

@@ -162,6 +162,109 @@
             }
         }
 
+        let memoryToDelete = null;
+
+        async function loadMemories(username) {
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/memories?username=${username}`);
+                const data = await res.json();
+
+                const list = document.getElementById("memory-list");
+                list.innerHTML = "";
+
+                if (!res.ok || !data.memories || data.memories.length === 0) {
+                    list.innerHTML = "<li class='memory-item'>No memories found</li>";
+                    return;
+                }
+
+                if (res.ok || data.memories) {
+                    document.getElementById("welcome-text").innerText = 
+                    `Hello, Welcome Back ${username}`
+                }
+
+                (data.memories || []).forEach((mem, index) => {
+                    const li = document.createElement("li");
+                    li.className = "memory-item";
+
+                    // Memory text
+                    const span = document.createElement("span");
+                    span.className = "memory-text-content";
+                    span.innerText = mem;
+
+                    // Three dots button
+                    const dotsBtn = document.createElement("button");
+                    dotsBtn.className = "dots-btn";
+                    dotsBtn.innerText = "•••";
+                    dotsBtn.onclick = (e) => toggleDropdown(e, index);
+
+                    // Dropdown menu
+                    const dropdown = document.createElement("div");
+                    dropdown.className = "dots-dropdown hidden";
+                    dropdown.id = `dropdown-${index}`;
+
+                    const deleteOption = document.createElement("button");
+                    deleteOption.className = "dropdown-delete";
+                    deleteOption.innerText = "🗑 Delete";
+                    deleteOption.onclick = () => showPopup(mem, index);
+
+                    dropdown.appendChild(deleteOption);
+                    li.appendChild(span);
+                    li.appendChild(dotsBtn);
+                    li.appendChild(dropdown);
+                    list.appendChild(li);
+                });
+
+            } catch (err) {
+                console.error("Error loading memories:", err);
+            }
+        }
+
+        function toggleDropdown(e, index) {
+            e.stopPropagation();
+            // Close all other dropdowns first
+            document.querySelectorAll(".dots-dropdown").forEach(d => d.classList.add("hidden"));
+            const dropdown = document.getElementById(`dropdown-${index}`);
+            dropdown.classList.toggle("hidden");
+        }
+
+        // Close dropdown when clicking anywhere else
+        document.addEventListener("click", () => {
+            document.querySelectorAll(".dots-dropdown").forEach(d => d.classList.add("hidden"));
+        });
+
+        function showPopup(mem, index) {
+            memoryToDelete = { mem, index };
+            document.getElementById("popup-overlay").classList.remove("hidden");
+            document.getElementById("popup-delete-btn").onclick = () => confirmDelete();
+        }
+
+        function closePopup() {
+            document.getElementById("popup-overlay").classList.add("hidden");
+            memoryToDelete = null;
+        }
+
+        async function confirmDelete() {
+            if (!memoryToDelete) return;
+
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/delete_memory`, {
+                    method : "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body   : JSON.stringify({
+                        username: currentUsername,
+                        memory  : memoryToDelete.mem
+                    })
+                });
+
+                if (res.ok) {
+                    closePopup();
+                    loadMemories(currentUsername); // refresh sidebar
+                }
+            } catch (err) {
+                console.error("Error deleting memory:", err);
+            }
+        }
+
         async function sendMessage() {
             // Read from bottom input if it's visible, otherwise welcome input
             const bottomInputArea = document.getElementById("bottom-input-area");

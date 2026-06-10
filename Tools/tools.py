@@ -7,7 +7,7 @@ def get_current_date() -> str:
     """Get today's date."""
     return datetime.now().strftime("%B %d, %Y")
 
-def web_search(query: str, max_results: int = 3) -> str:
+def web_search(query: str, max_results: int = 2) -> str:
     """Performs a live web search for the given query."""
     try:
         with DDGS() as ddgs:
