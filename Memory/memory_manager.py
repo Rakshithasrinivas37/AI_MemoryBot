@@ -134,3 +134,48 @@ class MemoryManager:
         prompt += f"Question: {user_query}\nProvide a detailed, well-structured response. Start with a clear explanation in paragraphs first. Add tables or bullet points only as a supplement if necessary. Do not repeat previous conversation:"
         print(prompt)
         return prompt
+    
+    def get_all_memories(self):
+        """Get all memories for a specific user."""
+
+        vectorstore = get_db(self.username)
+        results     = vectorstore.get()
+
+        print(results)
+
+        if not results["documents"]:
+            return []
+
+        return [
+            {
+                "summary"   : doc,
+                "created_at": meta.get("created_at", "")
+            }
+            for doc, meta in zip(
+                results["documents"],
+                results["metadatas"]
+            )
+        ]
+    
+    def delete_memory(self, mem_to_delete):
+        """Delete memory from vector database"""
+        vectorstore = get_db(self.username)
+        results     = vectorstore.get()
+
+        if not results["documents"]:
+                return []
+        
+        # Find the ID of the memory to delete
+        id_to_delete = None
+        for doc, doc_id in zip(results["documents"], results["ids"]):
+            if doc == mem_to_delete:
+                id_to_delete = doc_id
+                break
+
+        if not id_to_delete:
+            return {"status": "error", "message": "Memory not found"}
+
+        # Delete by ID
+        vectorstore._collection.delete(ids=[id_to_delete])
+
+        return {"status": "success", "message": "Memory deleted"}

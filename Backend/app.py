@@ -30,6 +30,10 @@ class chatInput(BaseModel):
   username: str
   user_input: str
 
+class MemoryToDelete(BaseModel):
+   username: str
+   memory: str
+
 @app.post("/login")
 async def login(data: LoginInput):
   
@@ -84,3 +88,51 @@ async def chat(data: chatInput):
         }
     )
 
+@app.get("/memories")
+async def memories(username: str):
+   if username not in user_sessions:
+        return JSONResponse(
+            status_code = 404,
+            content     = {
+                "status" : "error",
+                "message": "User not found"
+            }
+        )
+   
+   memories = user_sessions[username].get_all_memories()
+
+   documents = [
+        memory["summary"]
+        for memory in memories
+    ]
+
+   return JSONResponse(
+      status_code=200,
+      content={
+         "memories": documents
+      }
+   )
+
+@app.delete("/delete_memory")
+async def delete_memory(data: MemoryToDelete):
+   username = data.username
+   memory_to_delete = data.memory
+
+   if username not in user_sessions:
+        return JSONResponse(
+            status_code = 404,
+            content     = {
+                "status" : "error",
+                "message": "User not found"
+            }
+        )
+   
+   user_sessions[username].delete_memory(memory_to_delete)
+
+   return JSONResponse(
+      status_code = 200,
+      content = {
+         "status": "success",
+         "message": "Memory deleted successfully"
+      }
+   )
