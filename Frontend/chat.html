@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MemoryBot – Chat</title>
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- ← Add this line -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" />
+
+    <script src="marked.min.js"></script>
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" />
+</head>
+<body class="chat-page">
+
+    <div class="layout">
+
+        <!-- ══════════════════════════════════════════ -->
+        <!--                  SIDEBAR                   -->
+        <!-- ══════════════════════════════════════════ -->
+        <aside class="sidebar">
+
+            <!-- Logo -->
+            <div class="sidebar-logo">
+                <span class="logo-icon">🧠</span>
+                <span class="logo-text">MemoryBot</span>
+            </div>
+
+            <!-- Recent Memory -->
+            <div class="sidebar-section">
+                <p class="section-title">Recent Memory</p>
+                <ul class="memory-list" id="memory-list">
+                    <li class="memory-item loading">
+                        Loading memories...
+                    </li>
+                </ul>
+            </div>
+
+            <!-- User info at bottom -->
+            <div class="sidebar-user">
+                <div class="user-avatar">👤</div>
+                <span class="user-name" id="sidebar-username">
+                    Username
+                </span>
+            </div>
+
+        </aside>
+
+        <!-- ══════════════════════════════════════════ -->
+        <!--               MAIN CHAT AREA               -->
+        <!-- ══════════════════════════════════════════ -->
+        <main class="chat-main">
+
+            <!-- Top bar -->
+            <div class="topbar">
+                <div></div>
+                <button class="logout-btn" onclick="logout()">
+                    Logout
+                </button>
+            </div>
+
+            <!-- Messages area -->
+            <div class="messages-area" id="messages-area">
+
+                <!-- Welcome screen — centered before first message -->
+                <div class="welcome-msg" id="welcome-msg">
+
+                    <!-- Welcome text -->
+                    <p id="welcome-text">Hello, Welcome @Username</p>
+
+                    <!-- ✅ Centered input on welcome screen -->
+                    <div class="welcome-input" id="welcome-input">
+                        <textarea
+                            id          = "user-input"
+                            placeholder = "Type your query....."
+                            rows        = "1"
+                            onkeydown   = "handleKey(event)"
+                        ></textarea>
+                        <button
+                            class   = "send-btn"
+                            id      = "send-btn"
+                            onclick = "sendMessage()"
+                        >
+                            ➜
+                        </button>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Typing indicator -->
+            <div class="typing-indicator hidden" id="typing">
+                <span></span>
+                <span></span>
+                <span></span>
+                <p>MemoryBot is thinking...</p>
+            </div>
+
+            <!-- ✅ Bottom input — hidden initially -->
+            <!-- Shown after first message is sent   -->
+            <div class="input-area hidden" id="bottom-input-area">
+                <div class="input-box">
+                    <textarea
+                        id          = "user-input-bottom"
+                        placeholder = "Type your query....."
+                        rows        = "1"
+                        onkeydown   = "handleKeyBottom(event)"
+                    ></textarea>
+                    <button
+                        class   = "send-btn"
+                        onclick = "sendMessage()"
+                    >
+                        ➜
+                    </button>
+                </div>
+            </div>
+            <!-- Delete Confirmation Popup -->
+            <div class="popup-overlay hidden" id="popup-overlay">
+                <div class="popup-box">
+                    <p>Are you sure you want to delete this memory?</p>
+                    <div class="popup-actions">
+                        <button class="popup-delete-btn" id="popup-delete-btn">Delete</button>
+                        <button class="popup-cancel-btn" onclick="closePopup()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let currentUsername = null;
+        window.onload = function () {
+            const params = new URLSearchParams(window.location.search);
+            currentUsername = params.get("username");
+
+            console.log("RAW SESSION:", currentUsername);
+
+            // update UI
+            document.getElementById("sidebar-username").innerText = currentUsername;
+
+            document.getElementById("welcome-text").innerText =
+                `Hello, Welcome ${currentUsername}`;
+
+            loadMemories(currentUsername);
+        };
+
+
+        function handleKey(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function handleKeyBottom(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            // Read from bottom input if it's visible, otherwise welcome input
+            const bottomInputArea = document.getElementById("bottom-input-area");
+            const isBottomVisible = !bottomInputArea.classList.contains("hidden");
+
+            const activeInput = isBottomVisible
+                ? document.getElementById("user-input-bottom")
+                : document.getElementById("user-input");
+
+            const userInput = activeInput.value.trim();
+            if (!userInput) return;
+
+            activeInput.value = ""; // clear the correct input
+
+            const messagesArea = document.getElementById("messages-area");
+
+            document.getElementById("welcome-msg").style.display = "none";
+            messagesArea.classList.add("has-messages");
+            document.getElementById("bottom-input-area").classList.remove("hidden");
+
+            const chatBlock = document.createElement("div");
+            chatBlock.className = "chat-block";
+
+            const userMessage = document.createElement("div");
+            userMessage.className = "question-box";
+            userMessage.innerText = userInput;
+
+            chatBlock.appendChild(userMessage);
+            messagesArea.appendChild(chatBlock);
+
+            try {
+                document.getElementById("typing").classList.remove("hidden");
+
+                const res = await fetch("http://127.0.0.1:8000/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        username: currentUsername,
+                        user_input: userInput
+                    })
+                });
+
+                const data = await res.json();
+                console.log("FULL RESPONSE:", JSON.stringify(data));
+
+                document.getElementById("typing").classList.add("hidden");
+
+                // Create answer wrapper
+                const answerWrapper = document.createElement("div");
+                answerWrapper.className = "answer-wrapper";
+
+                // Bot answer
+                const botMessage = document.createElement("div");
+                botMessage.className = "answer-box";
+                botMessage.innerHTML = marked.parse(data.response ?? data.message ?? data.answer ?? JSON.stringify(data));
+
+                // Copy button
+                const copyBtn = document.createElement("button");
+                copyBtn.className = "copy-btn";
+                copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+
+                // JS tooltip
+                const tooltip = document.createElement("div");
+                tooltip.className = "copy-tooltip";
+                tooltip.innerText = "Copy";
+
+                copyBtn.appendChild(tooltip);
+
+                copyBtn.onmouseenter = () => tooltip.classList.add("visible");
+                copyBtn.onmouseleave = () => tooltip.classList.remove("visible");
+
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(data.response ?? data.message ?? data.answer ?? "")
+                        .then(() => {
+                            copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                            tooltip.innerText = "Copied!";
+                            copyBtn.classList.add("copied");
+                            copyBtn.appendChild(tooltip);
+
+                            setTimeout(() => {
+                                copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+                                tooltip.innerText = "Copy";
+                                copyBtn.classList.remove("copied");
+                                copyBtn.appendChild(tooltip);
+                            }, 2000);
+                        });
+                };
+
+                answerWrapper.appendChild(botMessage);
+                answerWrapper.appendChild(copyBtn);
+                chatBlock.appendChild(answerWrapper);
+
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+
+            } catch (err) {
+                document.getElementById("typing").classList.add("hidden");
+                console.error("Error sending message", err);
+            }
+        }
+    </script>
+
+</body>
+</html>
