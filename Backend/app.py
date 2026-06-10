@@ -1,8 +1,13 @@
 import os
+import sys
 from pydantic import BaseModel
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from Chatbot.bot import Chatbot
 
 app = FastAPI()
 
@@ -14,10 +19,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+user_sessions = {}
+
 class LoginInput(BaseModel):
   groq_api_key: str
   username: str
   hf_token: str
+
+class chatInput(BaseModel):
+  username: str
+  user_input: str
 
 @app.post("/login")
 async def login(data: LoginInput):
@@ -41,11 +52,35 @@ async def login(data: LoginInput):
             detail="Username cannot be empty, Please enter username!!"
         )
     
+    user_sessions[username] = Chatbot(groq_api_key, username)
+    
     return JSONResponse(
         status_code=200,
         content = {
         "message": f"Welcome, {username}",
         "is_new_user": True
         }   
+    )
+
+@app.post("/chat")
+async def chat(data: chatInput):
+    username = data.username
+    user_query = data.user_input
+
+    if not user_query:
+        raise HTTPException(
+            status_code=400,
+            detail="User query cannot be empty, Please enter the query!!"
+    )
+
+    chatbot = user_sessions[username]
+
+    response = chatbot.bot(user_query)
+
+    return JSONResponse(
+        status_code=200,
+        content={
+        "message": response
+        }
     )
 
