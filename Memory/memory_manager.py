@@ -179,3 +179,9 @@ class MemoryManager:
         vectorstore._collection.delete(ids=[id_to_delete])
 
         return {"status": "success", "message": "Memory deleted"}
+    
+    def save_on_exit(self):
+        """Save remaining messages before exit."""
+        if len(self.short_term_memory) > 0:
+            self.summarize_and_store()
+            print("✅ Memory saved on exit!")

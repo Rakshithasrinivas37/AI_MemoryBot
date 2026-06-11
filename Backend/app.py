@@ -34,6 +34,9 @@ class MemoryToDelete(BaseModel):
    username: str
    memory: str
 
+class LogoutInput(BaseModel):
+   username: str
+
 @app.post("/login")
 async def login(data: LoginInput):
   
@@ -136,3 +139,27 @@ async def delete_memory(data: MemoryToDelete):
          "message": "Memory deleted successfully"
       }
    )
+
+@app.post("/logout")
+async def logout(data: LogoutInput):
+    username = data.username
+
+    if username not in user_sessions:
+        return JSONResponse(
+            status_code = 404,
+            content     = {
+                "status" : "error",
+                "message": "User not found"
+            }
+        )
+
+    user_sessions[username].save_on_exit()
+    del user_sessions[username]
+
+    return JSONResponse(
+        status_code = 200,
+        content     = {
+            "status" : "success",
+            "message": f"Goodbye, {username}!"
+        }
+    )
