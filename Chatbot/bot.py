@@ -70,6 +70,9 @@ class Chatbot:
                     "content"     : str(tool_result)
                 })
 
+    def save_on_exit(self):
+        self.memory_manager.save_on_exit()
+    
     def get_all_memories(self):
         return self.memory_manager.get_all_memories()
     

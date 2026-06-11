@@ -364,6 +364,31 @@
                 console.error("Error sending message", err);
             }
         }
+
+        async function logout() {
+        try {
+            const res = await fetch("http://127.0.0.1:8000/logout", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username: currentUsername
+                })
+            });
+            const data = await res.json();
+
+            document.getElementById("welcome-text").innerText =
+            `Goodbye, ${currentUsername}`;
+            if (res.ok && data.status === "success") {
+                window.location.href = "index.html";
+            }
+        } catch (err) {
+            console.error("Error logging out", err);
+        }
+
+        
+    }
     </script>
 
 </body>

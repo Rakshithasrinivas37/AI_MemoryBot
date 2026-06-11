@@ -561,8 +561,6 @@ body {
 }
 
 /* ── Answer Wrapper ─────────────────────────────────── */
-
-/* ── Answer Wrapper ─────────────────────────────────── */
 .answer-wrapper {
     display       : flex;
     flex-direction: column;
@@ -717,6 +715,34 @@ body {
 .send-btn:disabled {
     background: #a5b4fc;
     cursor    : not-allowed;
+}
+
+/* ── Topbar ─────────────────────────────────────────── */
+.topbar {
+    display        : flex;
+    align-items    : center;
+    justify-content: space-between;
+    padding        : 14px 28px;
+    border-bottom  : 1px solid #e0e0e0;
+    background     : #ffffff;
+    flex-shrink    : 0;
+}
+
+.logout-btn {
+    padding      : 9px 24px;
+    background   : #111111;
+    color        : #ffffff;
+    border       : none;
+    border-radius: 10px;
+    font-size    : 13px;
+    font-weight  : 600;
+    cursor       : pointer;
+    transition   : background 0.2s, transform 0.1s;
+}
+
+.logout-btn:hover {
+    background: #333333;
+    transform : translateY(-1px);
 }
 
 /* ── Utility ────────────────────────────────────────── */
