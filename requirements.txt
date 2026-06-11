@@ -1,0 +1,10 @@
+uvicorn==0.42.0
+pydantic==2.11.10
+fastapi==0.135.1
+groq==0.37.1
+langchain_huggingface==1.2.2
+langchain_classic==1.0.2
+langchain-community==0.4.1
+sentence-transformers==5.5.1
+ddgs==9.14.4
+chromadb==1.1.1
