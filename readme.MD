@@ -48,7 +48,7 @@ The bot automatically decides when to use tools:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ai-memorybot.git
+git clone https://github.com/Rakshithasrinivas37/AI_MemoryBot.git
 cd ai-memorybot
 
 # Install dependencies
@@ -59,10 +59,12 @@ pip install -r requirements.txt
 
 ```bash
 # Start the backend
-uvicorn Backend.app:app --reload --port 8000
+cd Backend
+uvicorn app:app --reload --port 8000
 
 # Start the frontend (in a separate terminal)
-python Frontend/serve.py
+cd Frontend
+python serve.py
 ```
 
 Then open your browser at `http://localhost:5500` and log in with your username, Groq API key and HF Token.
