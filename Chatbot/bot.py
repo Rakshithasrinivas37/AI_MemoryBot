@@ -4,16 +4,33 @@ import json
 from Memory.memory_manager import MemoryManager
 from Tools.tools import get_tools
 
+BLOCKED_KEYWORDS = ["hack", "exploit", "bomb", "illegal"]
+
 class Chatbot:
     def __init__(self, groq_api_key, username):
         self.groq_api_key = groq_api_key
         self.username = username
         self.memory_manager = MemoryManager(self.username, self.groq_api_key, summarize_every=5)
 
+    def validate_input(self, user_input: str):
+        for word in BLOCKED_KEYWORDS:
+            if word in user_input.lower():
+                return False, "I can't help with that."
+        return True, None
+
+    def validate_output(self, response: str):
+        # block if response is too short or empty
+        if len(response.strip()) < 5:
+            return "I couldn't generate a response. Please try again."
+
     def bot(self, user_query):
         client = Groq(
             api_key=self.groq_api_key
         )
+
+        bool_value, message = self.validate_input(user_query)
+        if not bool_value:
+            return message
 
         prompt = self.memory_manager.build_prompt(user_query)
 
@@ -47,7 +64,8 @@ class Chatbot:
             # ── No tool needed — final answer ────────
             if not tool_calls:
                 response = response_msg.content
-                self.memory_manager.add_messages((user_query, response))
+                validated_response = self.validate_output(response)
+                self.memory_manager.add_messages((user_query, validated_response))
                 return response
 
             for tool_call in tool_calls:
