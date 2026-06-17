@@ -1,0 +1,12 @@
+[
+  {
+    "query": "Explain transformer architecture.",
+    "response": "**Transformer Architecture Overview**\n\nThe transformer, introduced in *\u201cAttention Is All You Need\u201d* (Vaswani\u202fet\u202fal., 2017), is a deep\u2011learning model built around the **self\u2011attention** mechanism. Unli",
+    "scores": {
+      "correctness": 5,
+      "relevance": 5,
+      "completeness": 5,
+      "reason": "The response accurately and thoroughly explains transformer architecture, covering all core components, mechanisms, and practical considerations."
+    }
+  }
+]

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from Chatbot.bot import Chatbot
+from Evaluation.evaluate import Evaluate
 
 app = FastAPI()
 
@@ -83,6 +84,21 @@ async def chat(data: chatInput):
     chatbot = user_sessions[username]
 
     response = chatbot.bot(user_query)
+
+    # ── Auto evaluate every response ─────────────────
+    evaluation_instance = Evaluate(
+        api_key      = chatbot.groq_api_key,
+        user_query   = user_query,
+        response = response
+    )
+
+    scores = evaluation_instance.auto_evaluate()
+    if scores:
+        print(f"\n📊 Auto Eval → {user_query[:50]}")
+        print(f"   Correctness : {scores['correctness']}/5")
+        print(f"   Relevance   : {scores['relevance']}/5")
+        print(f"   Completeness: {scores['completeness']}/5")
+        print(f"   Reason      : {scores['reason']}")
 
     return JSONResponse(
         status_code=200,
