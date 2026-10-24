@@ -3,6 +3,11 @@ from langchain_classic.vectorstores import Chroma
 import uuid
 from datetime import datetime
 from RAG.llm_reranking import llm_rerank
+from RAG.hybrid_ranking import tokenize
+from rank_bm25 import BM25Okapi
+from langchain_core.documents import Document
+from langchain_community.retrievers import BM25Retriever
+from langchain_classic.retrievers import EnsembleRetriever
 
 import os
 
@@ -33,8 +38,9 @@ def get_db(username):
   )
 
 
-def store_in_database(long_term_memory, username):
-    """Store summary — only call when memory is ready."""
+def store_in_database(long_term_memory, username, raw_user_messages=""):
+    """Store summary (searchable by vector) plus the user's raw lines in metadata
+    (used only for BM25 keyword ranking). Only call when memory is ready."""
 
     # ✅ Guard — don't store empty memory
     if not long_term_memory or long_term_memory.strip() == "":
@@ -47,92 +53,70 @@ def store_in_database(long_term_memory, username):
         metadatas = [{
             "source": "long_term_memory",
             "username": username,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "raw_user_messages": raw_user_messages or ""
         }],
         ids       = [str(uuid.uuid4())]
     )
     print(f"✅ Stored in DB: {long_term_memory[:60]}...")
 
-def retrieve_from_database(query, client, username, top_k=3):
-    ## Retrieve from database and rank the retrieved responses
+def retrieve_from_database(query, client, username, top_k=3, rrf_k=60):
+    ## Hybrid retrieval: vector search + BM25 (rank_bm25), merged with RRF
+    ## (LangChain EnsembleRetriever), then LLM rerank
     vectorstore = get_db(username)
     existing    = vectorstore.get()
 
     if not existing["documents"]:
         return ""
 
-    total = len(existing["documents"])
+    documents = existing["documents"]
+    metadatas = existing.get("metadatas") or [None] * len(documents)
+    total     = len(documents)
     print(f"\n📂 Total memories: {total}")
 
-    # ── Step 1: Vector similarity ──────────────────────
-    results = vectorstore.similarity_search_with_score(
-        query = query,
-        k     = total
-    )
-    results.sort(key=lambda x: x[1])
+    # ── Vector retriever (searches the summaries) ──────
+    vector_retriever = vectorstore.as_retriever(search_kwargs={"k": total})
 
-    print("\n📊 Step 1 — Similarity ranking:")
-    for i, (doc, score) in enumerate(results):
-        relevance = round((1 - score) * 100, 1)
-        print(f"  [{i+1}] {relevance}% | {doc.page_content[:60]}")
+    # ── BM25 retriever ─────────────────────────────────
+    # Index = summary + the user's raw lines (older memories: summary only),
+    # but the returned documents carry the summary, so both retrievers return
+    # the same text and the ensemble can merge them.
+    keyword_texts = [
+        f"{doc} {(meta or {}).get('raw_user_messages', '')}".strip()
+        for doc, meta in zip(documents, metadatas)
+    ]
+    bm25_index  = BM25Okapi([tokenize(t) for t in keyword_texts])
+    query_terms = tokenize(query)
+    bm25_scores = bm25_index.get_scores(query_terms)
 
-    memories = [doc.page_content for doc, score in results]
+    # BM25Okapi.get_top_n pads results with zero-score documents, which would
+    # add noise to the fusion. Keep only documents that actually matched.
+    n_matches = sum(1 for s in bm25_scores if s > 0)
+    print(f"\n📊 BM25 (keywords: {query_terms}) — {n_matches} matching memories")
 
-    # ── Step 2: Keyword ranking ────────────────────────
-    stop_words = {"i", "am", "is", "are", "the", "a",
-                  "an", "my", "me", "what", "how", "who",
-                  "do", "did", "was", "were", "have", "has",
-                  "you", "your", "we", "our", "they"}
+    if n_matches == 0:
+        print("  (no keyword matches — using vector ranking only)")
+        fused_docs = vector_retriever.invoke(query)
+    else:
+        bm25_retriever = BM25Retriever(
+            vectorizer      = bm25_index,
+            docs            = [Document(page_content=d) for d in documents],
+            k               = n_matches,
+            preprocess_func = tokenize,
+        )
+        # ── Reciprocal Rank Fusion (weighted RRF, c = rrf_k) ──
+        ensemble = EnsembleRetriever(
+            retrievers = [vector_retriever, bm25_retriever],
+            weights    = [1.0, 1.0],
+            c          = rrf_k,
+        )
+        fused_docs = ensemble.invoke(query)
 
-    # ✅ Strip punctuation before filtering stop words
-    query_words = set([
-        w.lower().strip("?.,!\"'")
-        for w in query.split()
-        if w.lower().strip("?.,!\"'") not in stop_words
-        and w.lower().strip("?.,!\"'") != ""
-    ])
+    print(f"\n📊 RRF fused ranking (c={rrf_k}):")
+    for rank, doc in enumerate(fused_docs, start=1):
+        print(f"  [{rank}] {doc.page_content[:60]}")
 
-    print(f"\n📊 Step 2 — Keyword ranking:")
-    print(f"  Keywords: {query_words}")
-
-    keyword_scores = []
-    for memory in memories:
-        memory_words = set(memory.lower().split())
-        overlap      = query_words & memory_words
-        keyword_scores.append((memory, len(overlap), overlap))
-        print(f"  Score={len(overlap)} | "
-              f"Matched={overlap} | {memory[:50]}")
-
-    # ── Step 3: Weighted combined score ───────────────
-    # similarity rank weight = 1
-    # keyword score weight   = 2 ✅ keyword more important
-    sim_ranks = {m: i for i, m in enumerate(memories)}
-    kw_sorted = sorted(
-        keyword_scores,
-        key=lambda x: x[1],
-        reverse=True
-    )
-    kw_ranks  = {m: i for i, (m, s, o) in enumerate(kw_sorted)}
-
-    print(f"\n📊 Step 3 — Weighted combined ranking:")
-    combined_scores = {}
-    for memory in memories:
-        sim_rank       = sim_ranks.get(memory, 0)
-        kw_rank        = kw_ranks.get(memory, 0)
-        # ✅ Lower combined score = better rank
-        combined_score = (sim_rank * 1) + (kw_rank * 2)
-        combined_scores[memory] = combined_score
-        print(f"  sim_rank={sim_rank} kw_rank={kw_rank} "
-              f"combined={combined_score} | {memory[:50]}")
-
-    sorted_memories = sorted(
-        combined_scores.keys(),
-        key=lambda m: combined_scores[m]
-    )
-
-    print(f"\n  Final order after combining:")
-    for i, m in enumerate(sorted_memories):
-        print(f"  [{i+1}] {m[:60]}")
+    sorted_memories = [doc.page_content for doc in fused_docs]
 
     # ── Step 4: LLM reranking ──────────────────────────
     top_candidates = sorted_memories[:min(5, len(sorted_memories))]

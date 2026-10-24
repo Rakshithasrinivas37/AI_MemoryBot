@@ -61,8 +61,11 @@ class MemoryManager:
 
         summary = chat_completion.choices[0].message.content
 
+        ## Keep the user's own lines (not the assistant's) for keyword search
+        raw_user_messages = "\n".join(user_input for user_input, _ in messages)
+
         ## Save to Database
-        store_in_database(summary, self.username)
+        store_in_database(summary, self.username, raw_user_messages)
 
         ## Update Long Term Memory
         self.long_term.update_memory(summary)
