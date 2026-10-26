@@ -1,11 +1,13 @@
 from datetime import datetime
 import json
+import os
+from zoneinfo import ZoneInfo
 
 from ddgs import DDGS
 
 def get_current_date() -> str:
-    """Get today's date."""
-    return datetime.now().strftime("%B %d, %Y")
+    """Get today's date in the configured user timezone."""
+    return datetime.now(ZoneInfo(os.getenv("MEMORYBOT_TIMEZONE", "Asia/Singapore"))).strftime("%B %d, %Y")
 
 def web_search(query: str, max_results: int = 2) -> str:
     """Performs a live web search for the given query."""
@@ -25,7 +27,8 @@ TOOLS = [
             "parameters" : {
                 "type"      : "object",
                 "properties": {},
-                "required"  : []
+                "required"  : [],
+                "additionalProperties": False
             }
         }
     },
@@ -33,16 +36,17 @@ TOOLS = [
         "type": "function",
         "function": {
             "name"       : "web_search",
-            "description": "MUST use this tool when user asks about anything latest, recent, current, new, trending, or updated. This includes latest AI tools, frameworks, technologies, news, or any current events. DO NOT answer from memory for these questions.",
+            "description": "Search the web for current information using a self-contained query string. Required arguments example: {\"query\": \"latest AI news\"}. This is a search-only tool, not a browser: it does not support opening results, cursor, or id. Use for latest, recent, current, or updated information.",
             "parameters" : {
                 "type"      : "object",
                 "properties": {
                     "query": {
                         "type"       : "string",
-                        "description": "The search query"
+                        "description": "A self-contained search query. Include the topic from the conversation. Use conversation context for follow-ups. For latest events, include today's date from the system context"
                     }
                 },
-                "required": ["query"]
+                "required": ["query"],
+                "additionalProperties": False
             }
         }
     }

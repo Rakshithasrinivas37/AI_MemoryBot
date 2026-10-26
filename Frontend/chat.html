@@ -3,160 +3,91 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MemoryBot – Chat</title>
+    <meta name="theme-color" content="#202d3b" />
+    <title>MemoryBot — A little space for your mind</title>
     <link rel="stylesheet" href="style.css" />
-
-    <!-- ← Add this line -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" />
-
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='28' fill='%23de775b'/%3E%3Ctext x='18' y='77' font-size='80' fill='white'%3E✳%3C/text%3E%3C/svg%3E" />
     <script src="marked.min.js"></script>
-
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" />
+    <script src="markdown.js"></script>
 </head>
 <body class="chat-page">
-
     <div class="layout">
-
-        <!-- ══════════════════════════════════════════ -->
-        <!--                  SIDEBAR                   -->
-        <!-- ══════════════════════════════════════════ -->
-        <aside class="sidebar">
-
-            <!-- Logo -->
-            <div class="sidebar-logo">
-                <span class="logo-icon">🧠</span>
-                <span class="logo-text">MemoryBot</span>
-            </div>
-
-            <!-- Recent Memory -->
+        <aside class="sidebar" id="sidebar" aria-label="Your memories">
+            <a class="sidebar-logo" href="chat.html" aria-label="MemoryBot home"><span class="logo-icon" aria-hidden="true">✳</span><span>MemoryBot</span></a>
             <div class="sidebar-section">
-                <p class="section-title">Recent Memory</p>
-                <ul class="memory-list" id="memory-list">
-                    <li class="memory-item loading">
-                        Loading memories...
-                    </li>
-                </ul>
+                <div class="section-heading"><h2 class="section-title">Memory collection</h2><span id="memory-count" class="count">0</span></div>
+                <label class="memory-search"><span aria-hidden="true">⌕</span><input type="search" id="memory-search" placeholder="Find a memory…" aria-label="Search memories" oninput="filterMemories()" /></label>
+                <ul class="memory-list" id="memory-list"><li class="memory-item loading">Gathering your memories…</li></ul>
+                <p id="search-empty" class="hidden muted">No matching memories.</p>
             </div>
-
-            <!-- User info at bottom -->
-            <div class="sidebar-user">
-                <div class="user-avatar">👤</div>
-                <span class="user-name" id="sidebar-username">
-                    Username
-                </span>
-            </div>
-
+            <div class="sidebar-user"><div class="user-avatar" id="user-avatar">Y</div><div><span class="user-name" id="sidebar-username">Your space</span><small>Personal workspace</small></div><span class="user-dot" aria-hidden="true"></span></div>
         </aside>
-
-        <!-- ══════════════════════════════════════════ -->
-        <!--               MAIN CHAT AREA               -->
-        <!-- ══════════════════════════════════════════ -->
+        <button class="sidebar-backdrop hidden" id="sidebar-backdrop" onclick="toggleSidebar()" aria-label="Close memories"></button>
         <main class="chat-main">
-
-            <!-- Top bar -->
-            <div class="topbar">
-                <div></div>
-                <button class="logout-btn" onclick="logout()">
-                    Logout
-                </button>
+            <header class="topbar"><div class="topbar-title"><button class="menu-btn" id="menu-btn" onclick="toggleSidebar()" aria-label="Toggle memories" aria-expanded="false" aria-controls="sidebar">☰</button><span class="topbar-symbol" aria-hidden="true">✦</span><div>Your thinking space</div></div><button class="logout-btn" onclick="logout()">Sign out <span aria-hidden="true">↗</span></button></header>
+            <div class="messages-area" id="messages-area" role="region" aria-label="Conversation">
+                <section class="welcome-msg" id="welcome-msg">
+                    <div class="memory-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span><span class="art-spark">✧</span><div class="memory-core">✳</div></div>
+                    <p class="eyebrow" id="welcome-text">WELCOME TO YOUR SPACE</p>
+                    <h1>What’s on your <em>mind?</em></h1>
+                    <div class="welcome-input" id="welcome-input"><textarea id="user-input" placeholder="What's on your mind?" aria-label="Your message" rows="2" onkeydown="handleKey(event)"></textarea><div class="composer-footer"><button class="send-btn" id="send-btn" onclick="sendMessage()" aria-label="Send message">↑</button></div></div>
+                    <div class="prompt-grid" aria-label="Conversation starters"><button class="prompt-card" onclick="usePrompt('What do you remember about me?')"><span class="prompt-icon peach" aria-hidden="true">↺</span><strong>Pick up a thread</strong><span>Revisit what makes you, you.</span><b aria-hidden="true">↗</b></button><button class="prompt-card" onclick="usePrompt('Help me brainstorm an idea. Ask me what I am working on.')"><span class="prompt-icon sage" aria-hidden="true">✳</span><strong>Find a fresh angle</strong><span>Give your next idea some space.</span><b aria-hidden="true">↗</b></button><button class="prompt-card" onclick="usePrompt('Help me reflect on my day. Start by asking me how it went.')"><span class="prompt-icon lilac" aria-hidden="true">☼</span><strong>A moment to reflect</strong><span>Unpack the day, one thought at a time.</span><b aria-hidden="true">↗</b></button></div>
+                </section>
             </div>
-
-            <!-- Messages area -->
-            <div class="messages-area" id="messages-area">
-
-                <!-- Welcome screen — centered before first message -->
-                <div class="welcome-msg" id="welcome-msg">
-
-                    <!-- Welcome text -->
-                    <p id="welcome-text">Hello, Welcome @Username</p>
-
-                    <!-- ✅ Centered input on welcome screen -->
-                    <div class="welcome-input" id="welcome-input">
-                        <textarea
-                            id          = "user-input"
-                            placeholder = "Type your query....."
-                            rows        = "1"
-                            onkeydown   = "handleKey(event)"
-                        ></textarea>
-                        <button
-                            class   = "send-btn"
-                            id      = "send-btn"
-                            onclick = "sendMessage()"
-                        >
-                            ➜
-                        </button>
-                    </div>
-
-                </div>
-
-            </div>
-
-            <!-- Typing indicator -->
-            <div class="typing-indicator hidden" id="typing">
-                <span></span>
-                <span></span>
-                <span></span>
-                <p>MemoryBot is thinking...</p>
-            </div>
-
-            <!-- ✅ Bottom input — hidden initially -->
-            <!-- Shown after first message is sent   -->
-            <div class="input-area hidden" id="bottom-input-area">
-                <div class="input-box">
-                    <textarea
-                        id          = "user-input-bottom"
-                        placeholder = "Type your query....."
-                        rows        = "1"
-                        onkeydown   = "handleKeyBottom(event)"
-                    ></textarea>
-                    <button
-                        class   = "send-btn"
-                        onclick = "sendMessage()"
-                    >
-                        ➜
-                    </button>
-                </div>
-            </div>
-            <!-- Delete Confirmation Popup -->
-            <div class="popup-overlay hidden" id="popup-overlay">
-                <div class="popup-box">
-                    <p>Are you sure you want to delete this memory?</p>
-                    <div class="popup-actions">
-                        <button class="popup-delete-btn" id="popup-delete-btn">Delete</button>
-                        <button class="popup-cancel-btn" onclick="closePopup()">Cancel</button>
-                    </div>
-                </div>
-            </div>
+            <div class="typing-indicator hidden" id="typing" role="status"><span></span><span></span><span></span><p>Connecting the dots…</p></div>
+            <div class="input-area hidden" id="bottom-input-area"><div class="input-box"><textarea id="user-input-bottom" placeholder="Keep the thought going…" aria-label="Your message" rows="1" onkeydown="handleKeyBottom(event)"></textarea><button class="send-btn" onclick="sendMessage()" aria-label="Send message">↑</button></div><p class="input-hint">Enter to send <span>·</span> Shift + Enter for a new line</p></div>
+            <p class="app-status hidden" id="app-status" role="status"></p>
+            <div class="popup-overlay hidden" id="popup-overlay"><div class="popup-box" role="dialog" aria-modal="true" aria-labelledby="delete-title"><span class="dialog-icon" aria-hidden="true">↺</span><h2 id="delete-title">Let this memory go?</h2><p>This removes it from your memory collection. This action cannot be undone.</p><div class="popup-actions"><button class="popup-cancel-btn" id="popup-cancel-btn" onclick="closePopup()">Keep memory</button><button class="popup-delete-btn" id="popup-delete-btn">Delete memory</button></div></div></div>
         </main>
     </div>
-
+    <dialog id="memory-detail" class="memory-detail" aria-labelledby="memory-detail-title">
+        <header class="memory-detail-header">
+            <div><h2 id="memory-detail-title"></h2><p id="memory-detail-date"></p></div>
+            <button type="button" class="logout-btn" onclick="document.getElementById('memory-detail').close()" autofocus aria-label="Close memory details">Close ×</button>
+        </header>
+        <section><h3>Summary</h3><div id="memory-detail-summary" class="answer-box memory-summary"></div></section>
+        <section><h3 id="memory-conversation-heading">Conversation</h3><div id="memory-detail-conversation"></div></section>
+    </dialog>
     <script>
         let currentUsername = null;
+        let isSending = false;
+        let popupTrigger = null;
+        let memoryRequestPending = false;
+        let lastMemorySnapshot = null;
+        const MEMORY_REFRESH_MS = 30000;
+
+        function refreshVisibleMemories() {
+            if (currentUsername && !document.hidden) loadMemories(currentUsername);
+        }
+        document.addEventListener("visibilitychange", refreshVisibleMemories);
+        window.addEventListener("focus", refreshVisibleMemories);
         window.onload = function () {
             const params = new URLSearchParams(window.location.search);
-            currentUsername = params.get("username");
+            currentUsername = params.get("username") || sessionStorage.getItem("username");
+            if (!currentUsername) { window.location.replace("index.html"); return; }
+            document.getElementById("user-avatar").textContent = currentUsername.charAt(0).toUpperCase();
 
-            console.log("RAW SESSION:", currentUsername);
 
             // update UI
             document.getElementById("sidebar-username").innerText = currentUsername;
 
             document.getElementById("welcome-text").innerText =
-                `Hello, Welcome ${currentUsername}`;
+                `YOUR SPACE, ${currentUsername}`;
 
             loadMemories(currentUsername);
+            setInterval(refreshVisibleMemories, MEMORY_REFRESH_MS);
         };
 
 
         function handleKey(event) {
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
                 event.preventDefault();
                 sendMessage();
             }
         }
 
         function handleKeyBottom(event) {
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
                 event.preventDefault();
                 sendMessage();
             }
@@ -165,36 +96,60 @@
         let memoryToDelete = null;
 
         async function loadMemories(username) {
+            if (!username || memoryRequestPending) return;
+            memoryRequestPending = true;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
             try {
-                const res = await fetch(`http://127.0.0.1:8000/memories?username=${username}`);
+                const res = await fetch(`http://127.0.0.1:8000/memories?username=${encodeURIComponent(username)}`, {
+                    cache: "no-store",
+                    signal: controller.signal
+                });
                 const data = await res.json();
+                if (!res.ok) throw new Error(data.message || "Unable to load memories");
+                if (!Array.isArray(data.memories)) throw new Error("Invalid memories response");
+                const snapshot = JSON.stringify(data.memories);
+                // Preserve open menus and scroll position when nothing has changed.
+                if (snapshot === lastMemorySnapshot) return;
+                lastMemorySnapshot = snapshot;
+                document.getElementById("memory-count").textContent = data.memories.length;
 
                 const list = document.getElementById("memory-list");
                 list.innerHTML = "";
 
                 if (!res.ok || !data.memories || data.memories.length === 0) {
-                    list.innerHTML = "<li class='memory-item'>No memories found</li>";
+                    list.innerHTML = "<li class='memory-item'>A fresh page.<br>Your memories will find a home here as we talk.</li>";
+                    filterMemories();
                     return;
                 }
 
                 if (res.ok || data.memories) {
                     document.getElementById("welcome-text").innerText = 
-                    `Hello, Welcome Back ${username}`
+                    `WELCOME BACK, ${username}`
                 }
 
-                (data.memories || []).forEach((mem, index) => {
+                (data.memories || []).forEach((entry, index) => {
+                    // Accept old API responses during a rolling backend restart.
+                    const mem = typeof entry === "string"
+                        ? {summary: entry, title: entry.trim().split(/\s+/).slice(0, 6).join(" "), conversations: []}
+                        : entry;
                     const li = document.createElement("li");
                     li.className = "memory-item";
 
                     // Memory text
-                    const span = document.createElement("span");
-                    span.className = "memory-text-content";
-                    span.innerText = mem;
+                    const span = document.createElement("button");
+                    span.type = "button";
+                    span.className = "memory-text-content memory-open";
+                    span.textContent = mem.title || "Saved conversation";
+                    span.title = span.textContent;
+                    span.onclick = () => openMemory(mem);
+                    li.dataset.memory = `${mem.title || ""} ${mem.summary || ""}`;
 
                     // Three dots button
                     const dotsBtn = document.createElement("button");
                     dotsBtn.className = "dots-btn";
                     dotsBtn.innerText = "•••";
+                    dotsBtn.setAttribute("aria-label", "Memory options");
                     dotsBtn.onclick = (e) => toggleDropdown(e, index);
 
                     // Dropdown menu
@@ -204,7 +159,7 @@
 
                     const deleteOption = document.createElement("button");
                     deleteOption.className = "dropdown-delete";
-                    deleteOption.innerText = "🗑 Delete";
+                    deleteOption.innerText = "Delete memory";
                     deleteOption.onclick = () => showPopup(mem, index);
 
                     dropdown.appendChild(deleteOption);
@@ -213,18 +168,72 @@
                     li.appendChild(dropdown);
                     list.appendChild(li);
                 });
+                filterMemories();
 
             } catch (err) {
-                console.error("Error loading memories:", err);
+                // Keep the last successful list during temporary connection failures.
+                if (lastMemorySnapshot === null) {
+                    document.getElementById("memory-list").innerHTML = "<li class='memory-item'>Memories couldn’t load. <button class='retry-btn' onclick='loadMemories(currentUsername)'>Try again</button></li>";
+                }
+            } finally {
+                clearTimeout(timeout);
+                memoryRequestPending = false;
             }
+        }
+
+        function openMemory(memory) {
+            const dialog = document.getElementById("memory-detail");
+            document.getElementById("memory-detail-title").textContent = memory.title || "Saved conversation";
+            document.getElementById("memory-detail-date").textContent = memory.created_at || "";
+            document.getElementById("memory-detail-summary").innerHTML = renderMarkdown(memory.summary || "No summary available.");
+            const conversation = document.getElementById("memory-detail-conversation");
+            conversation.replaceChildren();
+            const turns = Array.isArray(memory.conversations) ? memory.conversations : [];
+            document.getElementById("memory-conversation-heading").textContent = turns.length
+                ? `Conversation · ${turns.length} exchange${turns.length === 1 ? "" : "s"}` : "Conversation";
+            if (!turns.length) {
+                const note = document.createElement("p");
+                note.className = "memory-history-note";
+                note.textContent = "The original conversation was not saved with this older memory. Only its summary is available.";
+                conversation.appendChild(note);
+            }
+            turns.forEach((turn, index) => {
+                const exchange = document.createElement("article");
+                exchange.className = "memory-exchange";
+                const heading = document.createElement("h4");
+                heading.textContent = `Exchange ${index + 1}`;
+                exchange.appendChild(heading);
+                const question = document.createElement("div");
+                question.className = "question-box memory-question";
+                question.setAttribute("aria-label", "You");
+                const userLabel = document.createElement("strong");
+                userLabel.className = "memory-role";
+                userLabel.textContent = "You";
+                const userText = document.createElement("div");
+                userText.textContent = turn.user || "";
+                question.append(userLabel, userText);
+
+                const answer = document.createElement("div");
+                answer.className = "answer-wrapper";
+                answer.setAttribute("aria-label", "MemoryBot");
+                const message = document.createElement("div");
+                message.className = "answer-box";
+                message.innerHTML = renderMarkdown(turn.assistant || "");
+                answer.appendChild(message);
+                exchange.append(question, answer);
+                conversation.appendChild(exchange);
+            });
+            if (!dialog.open) dialog.showModal();
+            dialog.scrollTop = 0;
         }
 
         function toggleDropdown(e, index) {
             e.stopPropagation();
+            const wasOpen = !document.getElementById(`dropdown-${index}`).classList.contains("hidden");
             // Close all other dropdowns first
             document.querySelectorAll(".dots-dropdown").forEach(d => d.classList.add("hidden"));
             const dropdown = document.getElementById(`dropdown-${index}`);
-            dropdown.classList.toggle("hidden");
+            dropdown.classList.toggle("hidden", wasOpen);
         }
 
         // Close dropdown when clicking anywhere else
@@ -234,13 +243,16 @@
 
         function showPopup(mem, index) {
             memoryToDelete = { mem, index };
+            popupTrigger = document.querySelectorAll(".dots-btn")[index] || document.activeElement;
             document.getElementById("popup-overlay").classList.remove("hidden");
             document.getElementById("popup-delete-btn").onclick = () => confirmDelete();
+            document.getElementById("popup-cancel-btn").focus();
         }
 
         function closePopup() {
             document.getElementById("popup-overlay").classList.add("hidden");
             memoryToDelete = null;
+            if (popupTrigger) popupTrigger.focus();
         }
 
         async function confirmDelete() {
@@ -252,16 +264,17 @@
                     headers: { "Content-Type": "application/json" },
                     body   : JSON.stringify({
                         username: currentUsername,
-                        memory  : memoryToDelete.mem
+                        memory_id: memoryToDelete.mem.id || null,
+                        memory: memoryToDelete.mem.summary
                     })
                 });
 
                 if (res.ok) {
                     closePopup();
                     loadMemories(currentUsername); // refresh sidebar
-                }
+                } else { showStatus("Couldn’t delete this memory. Please try again."); }
             } catch (err) {
-                console.error("Error deleting memory:", err);
+                showStatus("Couldn’t delete this memory. Check your connection and try again.");
             }
         }
 
@@ -275,9 +288,12 @@
                 : document.getElementById("user-input");
 
             const userInput = activeInput.value.trim();
-            if (!userInput) return;
+            if (!userInput || isSending) return;
+            isSending = true;
+            document.querySelectorAll(".send-btn").forEach(button => button.disabled = true);
 
             activeInput.value = ""; // clear the correct input
+            activeInput.style.height = "auto";
 
             const messagesArea = document.getElementById("messages-area");
 
@@ -294,6 +310,8 @@
 
             chatBlock.appendChild(userMessage);
             messagesArea.appendChild(chatBlock);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+            document.getElementById("user-input-bottom").focus();
 
             try {
                 document.getElementById("typing").classList.remove("hidden");
@@ -308,7 +326,7 @@
                 });
 
                 const data = await res.json();
-                console.log("FULL RESPONSE:", JSON.stringify(data));
+                if (!res.ok) throw new Error(data.detail || data.message || "Unable to send message");
 
                 document.getElementById("typing").classList.add("hidden");
 
@@ -319,11 +337,12 @@
                 // Bot answer
                 const botMessage = document.createElement("div");
                 botMessage.className = "answer-box";
-                botMessage.innerHTML = marked.parse(data.response ?? data.message ?? data.answer ?? JSON.stringify(data));
+                botMessage.innerHTML = renderMarkdown(data.response ?? data.message ?? data.answer ?? JSON.stringify(data));
 
                 // Copy button
                 const copyBtn = document.createElement("button");
                 copyBtn.className = "copy-btn";
+                copyBtn.setAttribute("aria-label", "Copy response");
                 copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 
                 // JS tooltip
@@ -350,7 +369,7 @@
                                 copyBtn.classList.remove("copied");
                                 copyBtn.appendChild(tooltip);
                             }, 2000);
-                        });
+                        }).catch(() => showStatus("Couldn’t copy. Please select and copy the response text."));
                 };
 
                 answerWrapper.appendChild(botMessage);
@@ -359,9 +378,23 @@
 
                 messagesArea.scrollTop = messagesArea.scrollHeight;
 
+                // A new long-term memory was just stored -> refresh the sidebar
+                if (data.memory_stored) {
+                    loadMemories(currentUsername);
+                }
+
             } catch (err) {
                 document.getElementById("typing").classList.add("hidden");
-                console.error("Error sending message", err);
+                const error = document.createElement("p");
+                error.className = "message-error";
+                error.textContent = "The reply couldn’t come through. Check your connection and try again.";
+                chatBlock.appendChild(error);
+                const bottomInput = document.getElementById("user-input-bottom");
+                if (!bottomInput.value) bottomInput.value = userInput;
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+            } finally {
+                isSending = false;
+                document.querySelectorAll(".send-btn").forEach(button => button.disabled = false);
             }
         }
 
@@ -381,14 +414,65 @@
             document.getElementById("welcome-text").innerText =
             `Goodbye, ${currentUsername}`;
             if (res.ok && data.status === "success") {
+                sessionStorage.removeItem("username");
+                sessionStorage.removeItem("groq_api_key");
+                sessionStorage.removeItem("hf_token");
                 window.location.href = "index.html";
-            }
+            } else { showStatus("Couldn’t sign out. Please try again."); }
         } catch (err) {
-            console.error("Error logging out", err);
+            showStatus("Couldn’t sign out. Check your connection and try again.");
         }
 
         
     }
+
+        function usePrompt(prompt) {
+            const input = document.getElementById("user-input");
+            input.value = prompt;
+            input.focus();
+        }
+        function filterMemories() {
+            const query = document.getElementById("memory-search").value.toLowerCase().trim();
+            const items = [...document.querySelectorAll("#memory-list .memory-item")];
+            let visible = 0;
+            items.forEach(item => {
+                const match = (item.dataset.memory ?? item.textContent).toLowerCase().includes(query);
+                item.classList.toggle("hidden", !match);
+                if (match) visible++;
+            });
+            document.getElementById("search-empty").classList.toggle("hidden", !query || visible > 0);
+        }
+        function toggleSidebar() {
+            const open = document.getElementById("sidebar").classList.toggle("is-open");
+            document.getElementById("sidebar-backdrop").classList.toggle("hidden", !open);
+            document.getElementById("menu-btn").setAttribute("aria-expanded", open);
+        }
+        let statusTimeout;
+        function showStatus(message) {
+            const status = document.getElementById("app-status");
+            status.textContent = message;
+            status.classList.remove("hidden");
+            clearTimeout(statusTimeout);
+            statusTimeout = setTimeout(() => status.classList.add("hidden"), 6000);
+        }
+        document.addEventListener("keydown", event => {
+            if (document.getElementById("memory-detail").open) return;
+            const popupOpen = !document.getElementById("popup-overlay").classList.contains("hidden");
+            if (event.key === "Escape") {
+                if (popupOpen) closePopup();
+                if (document.getElementById("sidebar").classList.contains("is-open")) toggleSidebar();
+            }
+            if (popupOpen && event.key === "Tab") {
+                event.preventDefault();
+                const cancel = document.getElementById("popup-cancel-btn");
+                const remove = document.getElementById("popup-delete-btn");
+                (document.activeElement === cancel ? remove : cancel).focus();
+            }
+        });
+        document.querySelectorAll("textarea").forEach(input => input.addEventListener("input", () => {
+            input.style.height = "auto";
+            input.style.height = Math.min(input.scrollHeight, 150) + "px";
+        }));
     </script>
 
 </body>

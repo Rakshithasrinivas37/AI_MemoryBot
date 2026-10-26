@@ -33,7 +33,8 @@ class chatInput(BaseModel):
 
 class MemoryToDelete(BaseModel):
    username: str
-   memory: str
+   memory: str | None = None
+   memory_id: str | None = None
 
 class LogoutInput(BaseModel):
    username: str
@@ -84,18 +85,25 @@ async def chat(data: chatInput):
     chatbot = user_sessions[username]
 
     response = chatbot.bot(user_query)
+    memory_stored = chatbot.memory_stored
 
     # ── Auto evaluate every response ─────────────────
     evaluation_instance = Evaluate(
         api_key      = chatbot.groq_api_key,
         user_query   = user_query,
-        response = response
+        response = response,
+        context = chatbot.evaluation_context,
     )
 
     scores = evaluation_instance.auto_evaluate()
     if scores:
         print(f"\n📊 Auto Eval → {user_query[:50]}")
-        print(f"   Correctness : {scores['correctness']}/5")
+        correctness = "cannot verify" if scores['correctness'] is None else f"{scores['correctness']}/5"
+        groundedness = "cannot verify" if scores['groundedness'] is None else f"{scores['groundedness']}/5"
+        print(f"   Correctness : {correctness}")
+        print(f"   Groundedness: {groundedness}")
+        print(f"   Evidence    : {scores['verification']}")
+        print(f"   Instructions: {scores['instruction_compliance']}/5")
         print(f"   Relevance   : {scores['relevance']}/5")
         print(f"   Completeness: {scores['completeness']}/5")
         print(f"   Reason      : {scores['reason']}")
@@ -103,7 +111,8 @@ async def chat(data: chatInput):
     return JSONResponse(
         status_code=200,
         content={
-        "message": response
+        "message": response,
+        "memory_stored": memory_stored
         }
     )
 
@@ -120,10 +129,7 @@ async def memories(username: str):
    
    memories = user_sessions[username].get_all_memories()
 
-   documents = [
-        memory["summary"]
-        for memory in memories
-    ]
+   documents = memories
 
    return JSONResponse(
       status_code=200,
@@ -146,7 +152,11 @@ async def delete_memory(data: MemoryToDelete):
             }
         )
    
-   user_sessions[username].delete_memory(memory_to_delete)
+   if not data.memory_id and not memory_to_delete:
+       raise HTTPException(status_code=400, detail="A memory ID is required")
+   result = user_sessions[username].delete_memory(memory_to_delete, data.memory_id)
+   if result.get("status") != "success":
+       raise HTTPException(status_code=404, detail="Memory not found")
 
    return JSONResponse(
       status_code = 200,
@@ -169,7 +179,8 @@ async def logout(data: LogoutInput):
             }
         )
 
-    user_sessions[username].save_on_exit()
+    if user_sessions[username].save_on_exit() is False:
+        raise HTTPException(status_code=503, detail="Could not save remaining conversation. Please retry sign out.")
     del user_sessions[username]
 
     return JSONResponse(

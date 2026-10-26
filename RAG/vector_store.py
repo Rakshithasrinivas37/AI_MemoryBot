@@ -1,6 +1,7 @@
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_classic.vectorstores import Chroma
 import uuid
+import json
 from datetime import datetime
 from RAG.llm_reranking import llm_rerank
 from RAG.hybrid_ranking import tokenize
@@ -38,14 +39,14 @@ def get_db(username):
   )
 
 
-def store_in_database(long_term_memory, username, raw_user_messages=""):
+def store_in_database(long_term_memory, username, raw_user_messages="", *, title="", conversations=None):
     """Store summary (searchable by vector) plus the user's raw lines in metadata
     (used only for BM25 keyword ranking). Only call when memory is ready."""
 
     # ✅ Guard — don't store empty memory
     if not long_term_memory or long_term_memory.strip() == "":
         print("⚠️ Memory is empty — nothing stored")
-        return
+        return False
 
     vectorstore = get_db(username)
     vectorstore.add_texts(
@@ -54,15 +55,18 @@ def store_in_database(long_term_memory, username, raw_user_messages=""):
             "source": "long_term_memory",
             "username": username,
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "raw_user_messages": raw_user_messages or ""
+            "raw_user_messages": raw_user_messages or "",
+            "title": title,
+            "conversations_json": json.dumps(conversations or [], ensure_ascii=False)
         }],
         ids       = [str(uuid.uuid4())]
     )
     print(f"✅ Stored in DB: {long_term_memory[:60]}...")
+    return True
 
 def retrieve_from_database(query, client, username, top_k=3, rrf_k=60):
     ## Hybrid retrieval: vector search + BM25 (rank_bm25), merged with RRF
-    ## (LangChain EnsembleRetriever), then LLM rerank
+    ## (LangChain EnsembleRetriever), then cross-encoder rerank
     vectorstore = get_db(username)
     existing    = vectorstore.get()
 
@@ -118,11 +122,11 @@ def retrieve_from_database(query, client, username, top_k=3, rrf_k=60):
 
     sorted_memories = [doc.page_content for doc in fused_docs]
 
-    # ── Step 4: LLM reranking ──────────────────────────
+    # ── Step 4: Cross-encoder reranking ──────────────────────────
     top_candidates = sorted_memories[:min(5, len(sorted_memories))]
 
-    print(f"\n📊 Step 4 — LLM reranking:")
-    final_ranked   = llm_rerank(query, top_candidates, client)
+    print(f"\n📊 Step 4 — Cross-encoder reranking:")
+    final_ranked   = llm_rerank(query, top_candidates)
 
     for i, m in enumerate(final_ranked):
         print(f"  [{i+1}] {m[:60]}")

@@ -1,65 +1,38 @@
-def llm_rerank(query, memories, client):
-    if not memories:
-        return []
-    if len(memories) == 1:
+"""Local cross-encoder reranking of retrieved memory candidates."""
+from functools import lru_cache
+import logging
+import math
+
+from sentence_transformers import CrossEncoder
+
+RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L6-v2"
+logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def get_reranker():
+    """Load lazily and reuse the model across queries."""
+    return CrossEncoder(RERANKER_MODEL, device="cpu", max_length=512)
+
+
+def llm_rerank(query, memories, client=None):
+    """Rank by relevance score; client is retained for caller compatibility.
+
+    If local inference fails, preserve the incoming hybrid-retrieval ranking.
+    """
+    if len(memories) <= 1:
         return memories
 
-    memories_text = "\n".join([
-        f"Memory {i+1}: {m}"
-        for i, m in enumerate(memories)
-    ])
-
-    prompt = f"""You are ranking memories to answer a question.
-
-        Question: "{query}"
-
-        Memories:
-        {memories_text}
-
-        Which memory BEST answers the question?
-        Rank ALL memories from most to least relevant.
-
-        Rules:
-        - If question asks about age → rank memories mentioning
-        age numbers or years old FIRST
-        - If question asks about name → rank memories with
-        name information FIRST
-        - Return ONLY numbers comma separated
-        - Most relevant first
-        - Example: 2,1 means Memory 2 is most relevant
-
-        Your ranking:"""
-
-    response = client.chat.completions.create(
-        model      = "llama-3.3-70b-versatile",
-        messages   = [{"role": "user", "content": prompt}],
-        max_tokens = 20
-    )
-
     try:
-        raw     = response.choices[0].message.content.strip()
-        print(f"  LLM ranking response: {raw}")
-
-        # ✅ Extract only digits
-        indices = [
-            int(x.strip()) - 1
-            for x in raw.replace(" ", "").split(",")
-            if x.strip().isdigit()
-        ]
-
-        reranked = [
-            memories[i]
-            for i in indices
-            if i < len(memories)
-        ]
-
-        # Add missed memories at end
-        for m in memories:
-            if m not in reranked:
-                reranked.append(m)
-
-        return reranked
-
-    except Exception as e:
-        print(f"⚠️ Rerank parse failed: {e}")
+        scores = get_reranker().predict(
+            [(query, memory) for memory in memories],
+            show_progress_bar=False,
+        )
+        if len(scores) != len(memories) or not all(math.isfinite(float(s)) for s in scores):
+            raise ValueError("Reranker returned invalid relevance scores")
+        # Stable sorting preserves the hybrid order when scores are tied.
+        indices = sorted(range(len(memories)), key=lambda i: float(scores[i]), reverse=True)
+        return [memories[i] for i in indices]
+    except Exception as error:
+        logger.warning("Cross-encoder reranking failed; keeping hybrid order: %s", error)
         return memories
