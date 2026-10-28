@@ -1,5 +1,6 @@
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_classic.vectorstores import Chroma
+from functools import lru_cache
 import uuid
 import json
 from datetime import datetime
@@ -16,7 +17,7 @@ import os
 ROOT_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ✅ Stores ChromaDB in AI Chatbot/Database/chroma_db
-CHROMA_PATH = os.path.join(ROOT_DIR, "Database", "chroma_db")
+CHROMA_PATH = os.getenv("MEMORYBOT_DB_PATH", os.path.join(ROOT_DIR, "Database", "chroma_db"))
 
 # ✅ Create folder if it doesn't exist
 os.makedirs(CHROMA_PATH, exist_ok=True)
@@ -24,16 +25,20 @@ os.makedirs(CHROMA_PATH, exist_ok=True)
 MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
 
 
-EMBEDDINGS = HuggingFaceEmbeddings(
-    model_name    = MODEL_ID,
-    model_kwargs  = {"device": "cpu"},
-    encode_kwargs = {"normalize_embeddings": True}
-)
+@lru_cache(maxsize=1)
+def get_embeddings():
+    """Download/load embeddings only when a session needs the database."""
+    return HuggingFaceEmbeddings(
+        model_name=MODEL_ID,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
+
 
 def get_db(username):
     return Chroma(
       collection_name    = f"long_term_memory_{username}",
-      embedding_function = EMBEDDINGS,
+      embedding_function = get_embeddings(),
       persist_directory  = CHROMA_PATH,
       collection_metadata = {"hnsw:space": "cosine"}
   )

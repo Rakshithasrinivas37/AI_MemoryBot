@@ -1,4 +1,6 @@
 import errno
+import json
+import os
 import http.server
 from functools import partial
 from pathlib import Path
@@ -9,6 +11,18 @@ FRONTEND_DIR = Path(__file__).resolve().parent
 
 
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path.split("?", 1)[0] == "/api-config.js":
+            base = os.getenv("MEMORYBOT_API_BASE", "http://127.0.0.1:8000")
+            payload = ("window.MEMORYBOT_API_BASE = " + json.dumps(base) + ";").encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+        super().do_GET()
+
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.send_header("Pragma", "no-cache")

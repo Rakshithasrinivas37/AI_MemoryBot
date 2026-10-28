@@ -1,0 +1,5 @@
+# Pipeline and container changes should be reviewed by the repository owner.
+/.github/ @Rakshithasrinivas37
+/Dockerfile @Rakshithasrinivas37
+/.dockerignore @Rakshithasrinivas37
+/compose.yaml @Rakshithasrinivas37

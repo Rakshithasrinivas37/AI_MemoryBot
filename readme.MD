@@ -91,7 +91,94 @@ Node.js is needed only for the UI checks. Tests use mocked services and do not v
 
 ## Notes
 
-- The frontend expects the backend at `http://127.0.0.1:8000`.
+- The separate development frontend expects the backend at `http://127.0.0.1:8000`; the container uses the same origin for both.
 - Summarization, rate-limit retries, and evaluation can make replies take longer.
 - Web-search dates default to `Asia/Singapore`; change them with `MEMORYBOT_TIMEZONE`.
 - This is a local prototype. Usernames select memory collections but are not authenticated accounts.
+
+## Docker
+
+Build and start the complete frontend + backend from the project folder:
+
+```bash
+docker compose up --build -d
+```
+
+Open `http://localhost:8000` and sign in as usual. API keys are entered at runtime;
+no keys, local databases, or conversation logs are included in the image. The frontend
+uses the API on the same host and port, so a different host port works too:
+
+```bash
+MEMORYBOT_PORT=8080 docker compose up -d
+```
+
+Named volumes keep saved memories/evaluation logs and downloaded models across container
+replacements. Public Hugging Face models download on first database/reranker use; runtime
+internet access is still needed for initial downloads, Groq, and web search. The health
+check verifies HTTP readiness, not API-key validity or model availability.
+
+Sign out to save pending conversations before stopping the container. Use
+`docker compose down` to stop it; adding `-v` also deletes the saved-data volumes.
+The app runs as a non-root user with one worker because sessions are held in memory.
+The Compose port binds to localhost by default; the application is still a prototype
+without account authentication.
+
+After the pipeline publishes an image, run it on an x86-64 or ARM64 machine with Docker
+(Linux containers; Docker Desktop on macOS/Windows):
+
+```bash
+docker pull ghcr.io/rakshithasrinivas37/ai_memorybot:latest
+docker run -d --name memorybot --init \
+  -p 127.0.0.1:8000:8000 \
+  -v memorybot-data:/data \
+  -v memorybot-models:/home/app/.cache/huggingface \
+  ghcr.io/rakshithasrinivas37/ai_memorybot:latest
+```
+
+Use `:sha-<full-commit-sha>` instead of `:latest` to run a specific published revision.
+If the GHCR package is private, authenticate with `docker login ghcr.io` using a token
+with `read:packages`, or make the package public in GitHub's package settings.
+
+## CI/CD on GitHub
+
+The workflow is `.github/workflows/ci-cd.yml`:
+
+1. **Push to any branch:** run Python and frontend tests, then build and smoke-test the Docker image.
+2. **Pull request to `main`:** run the same checks on the proposed merge. `CI gate` succeeds only when tests and the container check pass.
+3. **Review and merge:** review the pull request and manually merge it into `main` after CI passes. Nothing auto-merges.
+4. **Main branch:** rerun CI, then build and publish `linux/amd64` and `linux/arm64` images to GitHub Container Registry, tagged `latest` and `sha-<commit>`.
+
+The publish job uses GitHub's built-in `GITHUB_TOKEN` with `packages: write` permission.
+Branch and pull-request jobs have read-only repository access and do not publish images.
+This is image delivery only; it does not deploy to a server. A branch needs the workflow
+file for its push to trigger this pipeline. Open a PR manually; pushes do not create one.
+
+### One-time repository setup
+
+- Enable GitHub Actions and allow the actions used in the workflow.
+- Add a branch protection rule for `main`: require pull requests, **`CI gate`** status check, an up-to-date branch, and resolved conversations. Enforce the rule for administrators too.
+- A separate approving review is not required because this repository has one collaborator.
+  Merge remains manual. If you add collaborators, you can require an approving review later.
+- After the first publication, choose whether the GHCR package should be public or private.
+
+A ready-to-apply protection configuration is included. With GitHub CLI authenticated
+as a repository administrator, run from the project root:
+
+```bash
+gh api --method PUT repos/Rakshithasrinivas37/AI_MemoryBot/branches/main/protection \
+  --input .github/main-protection.json
+```
+
+This command replaces the existing protection configuration; inspect any existing rules
+before applying it. Workflow files alone do not require pull requests or block direct pushes.
+Push this change on a feature branch and open a PR to introduce the pipeline. The required
+check will run when the PR contains the workflow.
+
+For the API routing tests, install `httpx==0.28.1` alongside the project dependencies.
+You can reproduce the pipeline's frontend and container checks locally:
+
+```bash
+node tests/test_api_config.cjs
+docker build -t memorybot:ci .
+bash scripts/smoke_container.sh memorybot:ci
+```

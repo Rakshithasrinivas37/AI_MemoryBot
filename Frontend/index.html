@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#202d3b" /><title>MemoryBot — Your story starts here</title><link rel="stylesheet" href="style.css" /></head>
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#202d3b" /><title>MemoryBot — Your story starts here</title><link rel="stylesheet" href="style.css" /><script src="api-config.js"></script></head>
 <body class="login-page">
     <main class="login-layout">
         <section class="login-story"><a class="sidebar-logo" href="index.html"><span class="logo-icon" aria-hidden="true">✳</span><span>MemoryBot</span></a><div class="story-content"><h1>Some thoughts<br>deserve to<br><em>stay with you.</em></h1><div class="story-art" aria-hidden="true"><span>✳</span></div></div></section>
         <section class="login-form-section"><div class="login-container"><h2>Welcome <em>back.</em></h2><form onsubmit="event.preventDefault(); login()"><div class="input-group"><label for="username">What should we call you?</label><input type="text" id="username" placeholder="Your username" autocomplete="username" required /></div><div class="input-group"><label for="api_key">Groq API key <span>For your conversations</span></label><input type="password" id="api_key" placeholder="Enter your Groq API key" autocomplete="off" required /></div><div class="input-group"><label for="hf_token">Hugging Face token <span>For your memories</span></label><input type="password" id="hf_token" placeholder="Enter your Hugging Face token" autocomplete="off" required /></div><p id="error-msg" class="error" role="alert"></p><button class="login-btn" id="login-btn" type="submit">Sign in ↗</button></form><p class="login-note"><span aria-hidden="true">✧</span> Returning? Use the same username to reconnect with your memories.</p></div></section>
     </main>
     <script>
-        const BASE_URL = "http://127.0.0.1:8000";
+        const BASE_URL = window.MEMORYBOT_API_BASE ?? "";
 
         async function login() {
             if (document.getElementById("login-btn").disabled) return;
