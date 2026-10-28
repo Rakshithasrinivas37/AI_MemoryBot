@@ -1,0 +1,14 @@
+.memory_bot/
+.venv/
+**/__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+Database/chroma_db/
+**/eval_log.json
+**/eval_log.tmp
+mistral-demo/

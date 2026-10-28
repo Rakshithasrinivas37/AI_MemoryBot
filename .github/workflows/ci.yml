@@ -1,0 +1,82 @@
+name: MemoryBot CI
+
+on:
+  push:
+    branches: ['feature/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: memorybot-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install API test dependencies
+        run: python -m pip install fastapi==0.135.1 pydantic==2.11.10 httpx==0.28.1
+      - name: Python regression tests
+        run: python -m unittest discover -s tests -v
+      - name: Frontend regression tests
+        run: |
+          node tests/test_memory_details_ui.cjs
+          node tests/test_api_config.cjs
+      - name: Python syntax
+        run: python -m compileall -q Backend Chatbot Evaluation Memory RAG Tools Frontend
+
+  build:
+    name: Container build and smoke test (${{ matrix.arch }})
+    needs: tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: memorybot:ci
+          cache-from: type=gha,scope=memorybot-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=memorybot-${{ matrix.arch }}
+      - name: Test the running image without API keys
+        run: bash scripts/smoke_container.sh memorybot:ci
+
+  ci:
+    name: CI gate
+    if: always()
+    needs: [tests, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require tests and container build
+        env:
+          TESTS_RESULT: ${{ needs.tests.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: test "$TESTS_RESULT" = success && test "$BUILD_RESULT" = success
+

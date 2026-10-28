@@ -1,5 +1,6 @@
 """Evidence-aware evaluation that never prevents delivery of a chat response."""
 import json
+import os
 import logging
 from pathlib import Path
 from copy import deepcopy
@@ -7,7 +8,7 @@ from threading import Lock
 from groq import Groq
 
 logger = logging.getLogger(__name__)
-LOG_PATH = Path(__file__).resolve().with_name('eval_log.json')
+LOG_PATH = Path(os.getenv('MEMORYBOT_EVAL_LOG', str(Path(__file__).resolve().with_name('eval_log.json'))))
 LOG_LOCK = Lock()
 
 RUBRIC = '''Evaluate the answer using the question, previous conversation, memories, instructions,
@@ -96,6 +97,7 @@ class Evaluate:
 
         try:
             with LOG_LOCK:
+                LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
                 log = json.loads(LOG_PATH.read_text()) if LOG_PATH.exists() else []
                 if not isinstance(log, list):
                     raise ValueError("Evaluation log is not a list")

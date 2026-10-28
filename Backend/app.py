@@ -1,8 +1,10 @@
 import os
 import sys
+from pathlib import Path
 from pydantic import BaseModel
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,6 +21,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 
 user_sessions = {}
 
@@ -190,3 +197,6 @@ async def logout(data: LogoutInput):
             "message": f"Goodbye, {username}!"
         }
     )
+
+# Keep this last so API routes take precedence over static files.
+app.mount("/", StaticFiles(directory=Path(__file__).resolve().parents[1] / "Frontend", html=True), name="frontend")

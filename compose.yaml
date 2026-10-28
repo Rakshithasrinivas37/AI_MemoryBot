@@ -1,0 +1,18 @@
+services:
+  memorybot:
+    image: ${MEMORYBOT_IMAGE:-memorybot:local}
+    build: .
+    ports:
+      - "127.0.0.1:${MEMORYBOT_PORT:-8000}:8000"
+    environment:
+      MEMORYBOT_TIMEZONE: ${MEMORYBOT_TIMEZONE:-Asia/Singapore}
+    volumes:
+      - memorybot-data:/data
+      - memorybot-models:/home/app/.cache/huggingface
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+
+volumes:
+  memorybot-data:
+  memorybot-models:
