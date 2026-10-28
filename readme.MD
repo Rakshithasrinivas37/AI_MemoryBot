@@ -141,17 +141,17 @@ with `read:packages`, or make the package public in GitHub's package settings.
 
 ## CI/CD on GitHub
 
-The workflow is `.github/workflows/ci-cd.yml`:
+The pipelines are separate: `.github/workflows/ci.yml` and `.github/workflows/cd.yml`.
 
-1. **Push to any branch:** run Python and frontend tests, then build and smoke-test the Docker image.
+1. **Push to a `feature/**` branch:** run Python and frontend tests, then build and smoke-test the Docker image.
 2. **Pull request to `main`:** run the same checks on the proposed merge. `CI gate` succeeds only when tests and the container check pass.
 3. **Review and merge:** review the pull request and manually merge it into `main` after CI passes. Nothing auto-merges.
-4. **Main branch:** rerun CI, then build and publish `linux/amd64` and `linux/arm64` images to GitHub Container Registry, tagged `latest` and `sha-<commit>`.
+4. **Merge to main:** the resulting push triggers CD to build and publish `linux/amd64` and `linux/arm64` images to GitHub Container Registry, tagged `latest` and `sha-<commit>`.
 
 The publish job uses GitHub's built-in `GITHUB_TOKEN` with `packages: write` permission.
 Branch and pull-request jobs have read-only repository access and do not publish images.
-This is image delivery only; it does not deploy to a server. A branch needs the workflow
-file for its push to trigger this pipeline. Open a PR manually; pushes do not create one.
+This is image delivery only; it does not deploy to a server. A feature branch needs `ci.yml` for its push to trigger CI. CD runs only on pushes to
+`main`; branch protection requires CI before the manual PR merge. Open a PR manually; pushes do not create one.
 
 ### One-time repository setup
 
