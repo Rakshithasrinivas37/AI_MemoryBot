@@ -384,6 +384,13 @@ class Chatbot:
             "role": "system",
             "content": (
                 f"Today's date is {today}. "
+                'For general-information questions such as definitions, concepts, explanations, '
+                'and examples, answer directly from your pretrained knowledge without calling tools. '
+                'A relevant saved memory is not required. Use conversation context only when needed '
+                'to understand follow-up references; do not bring in unrelated personal memories. '
+                'For personal questions, use relevant memories and conversation. '
+                'Search when the user explicitly requests web research or needs current information. '
+                'If uncertain about a fact, say so rather than inventing it. '
                 'For latest events or current information, search the web using '
                 'this date as the reference, not a remembered date. Include it in '
                 'the query unless the user explicitly requests a historical period. '
