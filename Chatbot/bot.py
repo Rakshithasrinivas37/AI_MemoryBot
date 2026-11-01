@@ -16,7 +16,7 @@ LLM_WAIT_SECONDS = 30
 MAX_ANSWER_CONTINUATIONS = 2
 
 class RequiredToolNotCalled(Exception):
-    """Provider rejected text because the request required a tool call."""
+    """The provider rejected text where a required tool call was expected."""
 
 
 class Chatbot:
@@ -406,6 +406,11 @@ class Chatbot:
             "role": "system",
             "content": (
                 f"Today's date is {today}. "
+                'Respond to the latest user message; earlier requests are context, not unfinished tasks. '
+                'If the message is only thanks, a greeting, or an acknowledgment, reply warmly in one '
+                'short sentence without repeating advice, adding lists, continuing an earlier answer, '
+                'or calling tools. If the message also contains a new question or explicitly asks '
+                'to continue, address that request instead. '
                 'For general-information questions such as definitions, concepts, explanations, '
                 'and examples, answer directly from your pretrained knowledge without calling tools. '
                 'A relevant saved memory is not required. Use conversation context only when needed '
@@ -458,7 +463,8 @@ class Chatbot:
                     client, messages=messages, tools=TOOLS, tool_choice=tool_choice,
                 )
             except RequiredToolNotCalled:
-                # Search with application-owned arguments; never use rejected model text.
+                # Use application-owned arguments, never the rejected generation.
+                # This path is reached only while a current-information search is required.
                 query = f"{user_query} as of {today}"
                 print("[Tool] Model omitted required search; searching directly.")
                 result = self.run_tool_with_retry(TOOL_MAP, "web_search", {"query": query})
