@@ -51,6 +51,28 @@ class ToolLoopTests(unittest.TestCase):
         self.quiet.start()
         self.addCleanup(self.quiet.stop)
 
+    def test_missing_required_search_recovers_with_direct_search(self):
+        error = FakeBadRequestError("tool_use_failed")
+        error.body['error']['message'] = "Tool choice is required, but model did not call a tool"
+        error.body['error']['failed_generation'] = "Unverified newsletter list"
+        self.create.side_effect = [error, error, reply("Here are newsletters based on search results.")]
+        answer = self.bot.bot("Suggest newsletters for current AI news")
+        self.assertIn("based on search results", answer)
+        self.search.assert_called_once_with(
+            query="Suggest newsletters for current AI news as of October 26, 2026")
+        self.assertIn("Return a tool call, not an answer", str(self.create.call_args_list[1].kwargs))
+        self.assertNotIn('tools', self.create.call_args.kwargs)
+        self.assertNotIn('Unverified newsletter list', str(self.create.call_args.kwargs))
+        self.assertEqual(self.bot.evaluation_context['tool_results'][0]['result'], "Search results")
+        self.memory.add_messages.assert_called_once()
+
+    def test_missing_required_search_can_recover_on_model_retry(self):
+        error = FakeBadRequestError("tool_use_failed")
+        error.body['error']['message'] = "Tool choice is required, but model did not call a tool"
+        self.create.side_effect = [error, reply(calls=[tool_call()]), reply("Supported answer.")]
+        self.assertEqual(self.bot.bot("Latest AI news?"), "Supported answer.")
+        self.search.assert_called_once()
+
     def test_user_continue_keeps_exact_ending_after_history_is_cleared(self):
         notice = ("\n\n[This answer is incomplete because generation could not finish. "
                   "Please ask me to continue.]")

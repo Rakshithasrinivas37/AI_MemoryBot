@@ -102,13 +102,48 @@ Node.js is needed only for the UI checks. Tests use mocked services and do not v
 2. **Merge to `main`:** manually merge your pull request after CI passes.
 3. **Publish Docker image:** `cd.yml` runs on pushes to `main` and publishes the image to GitHub Container Registry.
 
-The image has `latest` and `sha-<commit>` tags. The pipeline publishes the image; you run the container yourself.
+4. **Deploy to EC2:** after publishing, CD sends the deployment script through AWS Systems Manager (SSM), pulls the exact published image by digest, replaces the container, and checks its Docker health status. If startup fails, it restores the previous container.
+
+The image also has `latest` and `sha-<commit>` tags. Deployment keeps the `memorybot-data` and `memorybot-models` volumes. Container replacement causes brief downtime and resets active sessions; sign out first to save pending conversations. Rollback restores the old container, not changes already written to the shared database.
 
 To require CI before merging, protect `main` with the **Build and test** check. The protection template currently uses the old name **CI gate**; update it before applying.
 
-## Run with Docker
+### EC2 deployment setup (SSM)
 
-After CD publishes successfully:
+1. Use an x86_64 EC2 instance with Docker running, plus `bash`, `flock`, and `base64` (available on Amazon Linux). Attach an EC2 IAM role with **AmazonSSMManagedInstanceCore** and ensure SSM Agent is running. Confirm the instance is online in Systems Manager.
+2. Create a **separate GitHub deployment role** trusted through GitHub OIDC. Use provider `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`, and restrict the subject to this repository's `main` branch. Follow [GitHub's AWS OIDC setup](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws); the subject must match your repository's format, including immutable IDs if enabled.
+3. Give that deployment role `ssm:SendCommand` on your EC2 instance ARN and the AWS-owned `AWS-RunShellScript` document ARN. Also allow `ssm:GetCommandInvocation` and `ssm:CancelCommand` with resource `*` for monitoring and cancellation.
+4. Add the GitHub Actions secrets below, then merge the workflow into `main`.
+
+| Secret | Value |
+|---|---|
+| `EC2_INSTANCE_ID` | Target instance, e.g. `i-0123456789abcdef0` |
+| `AWS_REGION` | Region containing the instance |
+| `AWS_ROLE_ARN` | GitHub deployment role ARN, not the EC2 instance role |
+
+For the SendCommand permission, use `arn:aws:ec2:REGION:ACCOUNT_ID:instance/INSTANCE_ID` and `arn:aws:ssm:REGION::document/AWS-RunShellScript` (the AWS-owned document ARN has an empty account field).
+
+SSH secrets and `EC2_DEPLOY_RUNNER` are no longer used. No inbound SSH port or stored AWS access keys are needed. EC2 must reach SSM endpoints over HTTPS, through internet access or VPC endpoints. It also needs internet access for GHCR, model downloads, and the app's external APIs.
+
+SSM runs the deployment script as root. For a private image, authenticate on EC2 beforehand with `sudo docker login ghcr.io` and a token with package-read access. The GitHub runner's registry login does not authenticate EC2.
+
+CD waits for the remote command to finish and fails if deployment or its health check fails. The existing script restores the previous container after normal startup failures. If the runner or SSM command is interrupted, inspect SSM Run Command history and `sudo docker ps -a` before retrying; cancellation cannot guarantee rollback. The health check verifies HTTP readiness, not model/API correctness.
+
+MemoryBot stays bound to EC2's localhost. With AWS CLI, the Session Manager plugin, and an AWS identity permitted to start port-forwarding sessions, run on your computer:
+
+```bash
+aws ssm start-session \
+  --target YOUR_INSTANCE_ID \
+  --region YOUR_AWS_REGION \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["8000"],"localPortNumber":["8080"]}'
+```
+
+Open **http://localhost:8080** while the session is running. These browser-access permissions belong to your local AWS identity, not the GitHub deployment role.
+
+## Run with Docker manually
+
+CD now starts the container on EC2 automatically. To run the published image on another machine:
 
 ```bash
 docker pull --platform linux/amd64 ghcr.io/rakshithasrinivas37/ai_memorybot:latest
