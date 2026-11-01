@@ -15,6 +15,10 @@ MAX_RETRIES = 2  # retries after the first attempt (3 attempts in total)
 LLM_WAIT_SECONDS = 30
 MAX_ANSWER_CONTINUATIONS = 2
 
+class RequiredToolNotCalled(Exception):
+    """The provider rejected text where a required tool call was expected."""
+
+
 class Chatbot:
     def __init__(self, groq_api_key, username):
         self.groq_api_key = groq_api_key
@@ -254,6 +258,24 @@ class Chatbot:
                         self.shrink_context(request_messages)
                     continue
                 if code == "tool_use_failed":
+                    required_tool = options.get("tool_choice")
+                    missing_call = (
+                        isinstance(required_tool, dict)
+                        and "did not call a tool" in str(details.get("message", "")).lower()
+                    )
+                    if missing_call:
+                        if hint_added or attempt == MAX_RETRIES:
+                            raise RequiredToolNotCalled() from error
+                        name = required_tool.get("function", {}).get("name", "web_search")
+                        request_messages.append({"role": "system", "content": (
+                            f"Your previous text answer was rejected because {name} must be called first. "
+                            "Return a tool call, not an answer. For web_search, supply exactly "
+                            '{"query": "a self-contained search phrase based on the user question"}. '
+                            "Use the earlier conversation to resolve the topic. Answer only after "
+                            "receiving the tool results."
+                        )})
+                        hint_added = True
+                        continue
                     if hint_added or attempt == MAX_RETRIES:
                         break
                     request_messages.append({"role": "system", "content": (
@@ -431,9 +453,19 @@ class Chatbot:
             if tools_allowed and needs_current_search and not search_attempted:
                 tool_choice = {"type": "function", "function": {"name": "web_search"}}
 
-            chat_completion = self.request_completion(
-                client, messages=messages, tools=TOOLS, tool_choice=tool_choice,
-            )
+            try:
+                chat_completion = self.request_completion(
+                    client, messages=messages, tools=TOOLS, tool_choice=tool_choice,
+                )
+            except RequiredToolNotCalled:
+                # Use application-owned arguments, never the rejected generation.
+                # This path is reached only while a current-information search is required.
+                query = f"{user_query} as of {today}"
+                print("[Tool] Model omitted required search; searching directly.")
+                result = self.run_tool_with_retry(TOOL_MAP, "web_search", {"query": query})
+                tool_results.append({"tool": "web_search", "arguments": {"query": query},
+                                     "result": str(result)})
+                return self.finish_with_results(client, user_query, today, tool_results)
 
             # All attempts failed
             if chat_completion is None:
