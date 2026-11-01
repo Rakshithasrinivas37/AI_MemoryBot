@@ -406,6 +406,11 @@ class Chatbot:
             "role": "system",
             "content": (
                 f"Today's date is {today}. "
+                'Respond to the latest user message; earlier requests are context, not unfinished tasks. '
+                'If the message is only thanks, a greeting, or an acknowledgment, reply warmly in one '
+                'short sentence without repeating advice, adding lists, continuing an earlier answer, '
+                'or calling tools. If the message also contains a new question or explicitly asks '
+                'to continue, address that request instead. '
                 'For general-information questions such as definitions, concepts, explanations, '
                 'and examples, answer directly from your pretrained knowledge without calling tools. '
                 'A relevant saved memory is not required. Use conversation context only when needed '
