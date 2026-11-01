@@ -18,6 +18,8 @@ jobs:
     name: Publish Docker image
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
     permissions:
       contents: read
       packages: write
@@ -37,6 +39,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     - uses: docker/build-push-action@v6
+      id: build
       with:
         context: .
         platforms: linux/amd64
@@ -49,3 +52,37 @@ jobs:
           org.opencontainers.image.revision=${{ github.sha }}
         cache-from: type=gha,scope=memorybot-cd
         cache-to: type=gha,mode=max,scope=memorybot-cd
+
+
+  deploy:
+    name: Deploy to EC2 via SSM
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate deployment settings
+        env:
+          EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+        run: |
+          test -n "$EC2_INSTANCE_ID"
+          test -n "$AWS_REGION"
+          test -n "$AWS_ROLE_ARN"
+      - name: Authenticate to AWS using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: MemoryBotDeploy-${{ github.run_id }}
+      - name: Deploy published image and wait for health check
+        env:
+          EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+        run: python3 scripts/deploy_ssm.py

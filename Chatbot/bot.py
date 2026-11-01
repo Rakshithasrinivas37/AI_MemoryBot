@@ -527,7 +527,7 @@ class Chatbot:
                         search_attempted = True
                     # Bad arguments are handled above; runtime errors are retried here
                     tool_result = self.run_tool_with_retry(TOOL_MAP, tool_name, tool_args)
-                except (ValueError, TypeError) as error:
+                except (ValueError, TypeError, SystemError) as error:
                     tool_result = f"Tool request failed: {error}. Correct the arguments before retrying."
 
                 tool_results.append({

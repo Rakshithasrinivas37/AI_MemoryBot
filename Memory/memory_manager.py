@@ -232,6 +232,9 @@ class MemoryManager:
         - For personal questions (name, job, location, interests), use the memories and the conversation. If neither has the answer, say you don't know it yet.
 
         USING THE CONVERSATION:
+        - Always respond to the latest user message. Earlier requests are context, not unfinished tasks to answer again.
+        - If the latest message is only thanks, a greeting, or an acknowledgment (for example, "Thank you for your guidance"), reply warmly in one short sentence. Do not repeat advice, add lists, resume an earlier answer, or call tools.
+        - If thanks or a greeting accompanies a new question or an explicit request to continue, address that request. Do not treat it as only an acknowledgment.
         - The earlier messages in this chat are the current conversation. Use them to understand follow-up questions. Words like "here", "there", "those", "stays" or "famous places" refer to the topic already being discussed (for example the destination in the previous questions).
         - Do not repeat your earlier answers. Answer only the new question, using the earlier context.
 
